@@ -3,49 +3,31 @@
 
 var game = new Phaser.Game(600, 1000, Phaser.AUTO, 'TutContainer', { preload: preload, create: create});
 
+function BlockData(topB,topRightB,bottomRightB,bottomB,bottomLeftB,topLeftB){
+    this.tBlock=topB;
+    this.trBlock=topRightB;
+    this.brBlock=bottomRightB;
+    this.bBlock=bottomB;
+    this.blBlock=bottomLeftB;
+    this.tlBlock=topLeftB;
+    this.mBlock=1;
+}
 
-var block1=
-[
-[0,1,0],
-[1,1,1],
-[0,0,0]];
-var block2=
-[
-[0,0,0],
-[1,1,1],
-[0,0,0]];
-var block3=
-[
-[0,1,0],
-[0,1,1],
-[0,0,0]];
-var block4=
-[
-[0,1,0],
-[0,1,1],
-[0,1,0]];
-var block5=
-[
-[0,1,0],
-[1,1,0],
-[0,1,0]];
-var block6=
-[
-[0,0,0],
-[1,1,1],
-[1,0,1]];
-var block7=
-[
-[0,1,0],
-[0,1,0],
-[0,1,0]];
+var block1= new BlockData(1,1,0,0,0,1);
 
-var currentBlock=
-[
-[0,0,0],
-[0,0,0],
-[0,0,0]];
+var block2= new BlockData(0,1,0,0,0,1);
 
+var block3= new BlockData(1,1,0,0,0,0);
+
+var block4= new BlockData(1,1,0,1,0,0);
+
+var block5= new BlockData(1,0,0,1,0,1);
+
+var block6= new BlockData(0,1,1,0,1,1);
+
+var block7= new BlockData(1,0,0,1,0,0);
+
+var currentBlock= new BlockData(0,0,0,0,0,0);
 
 var levelData=
 [
@@ -161,7 +143,10 @@ function renderScene(){
         
     }
 }
+/*
+//this one uses array coordinates, so we need to check for odd/even columns
 function paintBlock(erase){
+    var currentBlockData=arrayFromBlock(currentBlock);
     var startI=blockRowValue;
     var startJ=blockMidColumnValue-1;
     var q=0;
@@ -174,14 +159,14 @@ function paintBlock(erase){
                 if(erase){
                     levelData[i-1][j]=0;
                 }else{
-                    levelData[i-1][j]=currentBlock[q][r];
+                    levelData[i-1][j]=currentBlockData[q][r];
                 } 
             }else{
                 if(i<0||j<0)continue;
                if(erase){
                     levelData[i][j]=0;
                 }else{
-                    levelData[i][j]=currentBlock[q][r];
+                    levelData[i][j]=currentBlockData[q][r];
                 } 
             }
             r++
@@ -190,11 +175,68 @@ function paintBlock(erase){
         r=0;
     }
 }
-
+*/
+//let us use cubic coordinates to simplify it
+function paintBlock(erase){
+    var store=clockWise;
+    clockWise=true;
+    if(erase){//mid
+        levelData[blockRowValue+1][blockMidColumnValue]=0;
+    }else{
+        levelData[blockRowValue+1][blockMidColumnValue]=1;
+    }
+    var rotatingTile=new Phaser.Point(blockRowValue,blockMidColumnValue);
+    if(erase){//top
+        levelData[rotatingTile.x][rotatingTile.y]=0;
+    }else{
+        levelData[rotatingTile.x][rotatingTile.y]=currentBlock.tBlock;
+    }
+    var midPoint=new Phaser.Point(blockRowValue+1,blockMidColumnValue);
+    rotatingTile=rotateTileAroundTile(rotatingTile,midPoint);
+    if(erase){//tr
+        levelData[rotatingTile.x][rotatingTile.y]=0;
+    }else{
+        levelData[rotatingTile.x][rotatingTile.y]=currentBlock.trBlock;
+    }
+    midPoint.x=blockRowValue+1;
+    midPoint.y=blockMidColumnValue;
+    rotatingTile=rotateTileAroundTile(rotatingTile,midPoint);
+    if(erase){//br
+        levelData[rotatingTile.x][rotatingTile.y]=0;
+    }else{
+        levelData[rotatingTile.x][rotatingTile.y]=currentBlock.brBlock;
+    }
+    midPoint.x=blockRowValue+1;
+    midPoint.y=blockMidColumnValue;
+    rotatingTile=rotateTileAroundTile(rotatingTile,midPoint);
+    if(erase){//b
+        levelData[rotatingTile.x][rotatingTile.y]=0;
+    }else{
+        levelData[rotatingTile.x][rotatingTile.y]=currentBlock.bBlock;
+    }
+    midPoint.x=blockRowValue+1;
+    midPoint.y=blockMidColumnValue;
+    rotatingTile=rotateTileAroundTile(rotatingTile,midPoint);
+    if(erase){//bl
+        levelData[rotatingTile.x][rotatingTile.y]=0;
+    }else{
+        levelData[rotatingTile.x][rotatingTile.y]=currentBlock.blBlock;
+    }
+    midPoint.x=blockRowValue+1;
+    midPoint.y=blockMidColumnValue;
+    rotatingTile=rotateTileAroundTile(rotatingTile,midPoint);
+    if(erase){//tl
+        levelData[rotatingTile.x][rotatingTile.y]=0;
+    }else{
+        levelData[rotatingTile.x][rotatingTile.y]=currentBlock.tlBlock;
+    }
+    clockWise=store;
+}
 function releaseBlock(){
     blockRowValue=0;
     blockMidColumnValue=5;
     var whichBlock= Math.floor(1+(Math.random()*7));
+    //whichBlock=2;
     switch (whichBlock) {//assign blocks
         case 1:
             currentBlock=block1;
@@ -222,6 +264,7 @@ function releaseBlock(){
         default:
            
     }
+    console.log(whichBlock);
 }
 function moveLeft(){
     paintBlock(true);
@@ -257,12 +300,13 @@ function rotateBlock(){
     [0,1,0],
     [0,0,0]
     ];
+    var currentBlockData=arrayFromBlock(currentBlock);
     
     var rotatingTile=new Phaser.Point();
-    for (var i = 0; i < currentBlock.length; i++){
-            for (var j = 0; j < currentBlock[0].length; j++)
+    for (var i = 0; i < currentBlockData.length; i++){
+            for (var j = 0; j < currentBlockData[0].length; j++)
             {
-                if(currentBlock[i][j]==1){//find every solid tile & rotate
+                if(currentBlockData[i][j]==1){//find every solid tile & rotate
                     rotatingTile.x=i;
                     rotatingTile.y=j;
                     for (var k = 0; k < numRotations; k++)
@@ -273,7 +317,7 @@ function rotateBlock(){
                 }
             }
     }
-    currentBlock=newBlockData;
+    currentBlock=blockFromArray(newBlockData);
 }
 function rotateTileAroundTile(tileToRotate, anchorTile){
     tileToRotate=offsetToAxial(tileToRotate);//convert to axial
@@ -308,3 +352,28 @@ function arrayRotate(arr, reverse){//nifty method to rotate array elements
     arr.push(arr.shift())
   return arr
 } 
+function blockFromArray(arrayToConvert){
+    return new BlockData(
+        arrayToConvert[0][1],
+        arrayToConvert[1][2],
+        arrayToConvert[2][2],
+        arrayToConvert[2][1],
+        arrayToConvert[2][0],
+        arrayToConvert[1][0]
+    );
+}
+function arrayFromBlock(blockToConvert){
+    var newBlockData=
+    [
+    [0,0,0],
+    [0,1,0],
+    [0,0,0]
+    ];
+    newBlockData[0][1]=blockToConvert.tBlock;
+    newBlockData[1][2]=blockToConvert.trBlock;
+    newBlockData[2][2]=blockToConvert.brBlock;
+    newBlockData[2][1]=blockToConvert.bBlock;
+    newBlockData[2][0]=blockToConvert.blBlock;
+    newBlockData[1][0]=blockToConvert.tlBlock;
+    return newBlockData;
+}
