@@ -1,5 +1,5 @@
 /*global Phaser*/
-/* hexagonal A* pathfinding following http://www.policyalmanac.org/games/aStarTutorial.htm */
+/* demo cubic coordinates in horizontal alignment */
 
 var game = new Phaser.Game(800, 680, Phaser.AUTO, 'TutContainer', { preload: preload, create: create});
 

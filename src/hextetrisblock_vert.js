@@ -1,5 +1,5 @@
 /*global Phaser*/
-/* hexagonal A* pathfinding following http://www.policyalmanac.org/games/aStarTutorial.htm */
+/* block rotation using cubic coordinates */
 
 var game = new Phaser.Game(600, 600, Phaser.AUTO, 'TutContainer', { preload: preload, create: create});
 

@@ -1,7 +1,7 @@
 /*global Phaser*/
-/* hexagonal A* pathfinding following http://www.policyalmanac.org/games/aStarTutorial.htm */
+/* hexagonal tetris in vertical alignment */
 
-var game = new Phaser.Game(600, 1000, Phaser.AUTO, 'TutContainer', { preload: preload, create: create});
+var game = new Phaser.Game(600, 1000, Phaser.AUTO, 'TutContainer', { preload: preload, create: create, update:update});
 
 function BlockData(topB,topRightB,bottomRightB,bottomB,bottomLeftB,topLeftB){
     this.tBlock=topB;
@@ -28,6 +28,7 @@ var block6= new BlockData(0,1,1,0,1,1);
 var block7= new BlockData(1,0,0,1,0,0);
 
 var currentBlock= new BlockData(0,0,0,0,0,0);
+var prevBlock= new BlockData(0,0,0,0,0,0);
 
 var levelData=
 [
@@ -72,8 +73,11 @@ var startYInit=hexTileHeight/2;
 var axialPoint= new Phaser.Point();
 var cubicZ;
 
-var blockRowValue;
+var blockMidRowValue;
 var blockMidColumnValue;
+var needsRender;
+var elapsedTime;
+var blockPresent;
 
 function preload() {
     //load all necessary assets
@@ -108,9 +112,28 @@ function create() {
     // Maintain aspect ratio
     game.scale.scaleMode = Phaser.ScaleManager.SHOW_ALL;
     score=0;
-    
+    blockPresent=false;
     releaseBlock();
-    renderScene();
+    needsRender=true;
+    elapsedTime=0.0;
+}
+function update(){
+    elapsedTime+=game.time.physicsElapsed;
+    if(elapsedTime>1.2){
+        elapsedTime=0;
+        dropDown();
+        needsRender=true;
+    }
+    if(needsRender){
+        //check for collision / bottom
+        if(!canMove(1,0)){
+            paintBlock(false,true);
+            blockPresent=false;
+            checkAndCollapseRows();
+            releaseBlock();
+        }
+        renderScene();
+    }
 }
 function renderScene(){
     paintBlock();
@@ -133,8 +156,10 @@ function renderScene(){
             if(levelData[i][j]>-1){
                 axialPoint=offsetToAxial(axialPoint);
                 cubicZ=calculateCubicZ(axialPoint);
-                if(levelData[i][j]>0){
+                if(levelData[i][j]==1){
                     hexSprite.tint='0xff0000';
+                }else if(levelData[i][j]>1){
+                    hexSprite.tint='0x0000ff';
                 }
                 gameScene.renderXY(hexSprite,startX, startY, false);
             }
@@ -142,108 +167,22 @@ function renderScene(){
         }
         
     }
-}
-/*
-//this one uses array coordinates, so we need to check for odd/even columns
-function paintBlock(erase){
-    var currentBlockData=arrayFromBlock(currentBlock);
-    var startI=blockRowValue;
-    var startJ=blockMidColumnValue-1;
-    var q=0;
-    var r=0
-    for (var i = startI; i < startI+3; i++){
-        for (var j = startJ; j < startJ+3; j++)
-        {
-            if(blockMidColumnValue%2==0 && j%2!=0){
-                if(i-1<0||j<0)continue;
-                if(erase){
-                    levelData[i-1][j]=0;
-                }else{
-                    levelData[i-1][j]=currentBlockData[q][r];
-                } 
-            }else{
-                if(i<0||j<0)continue;
-               if(erase){
-                    levelData[i][j]=0;
-                }else{
-                    levelData[i][j]=currentBlockData[q][r];
-                } 
-            }
-            r++
-        }
-        q++;
-        r=0;
-    }
-}
-*/
-//let us use cubic coordinates to simplify it
-function paintBlock(erase){
-    var store=clockWise;
-    clockWise=true;
-    if(erase){//mid
-        levelData[blockRowValue+1][blockMidColumnValue]=0;
-    }else{
-        levelData[blockRowValue+1][blockMidColumnValue]=1;
-    }
-    var rotatingTile=new Phaser.Point(blockRowValue,blockMidColumnValue);
-    if(erase){//top
-        levelData[rotatingTile.x][rotatingTile.y]=0;
-    }else{
-        levelData[rotatingTile.x][rotatingTile.y]=currentBlock.tBlock;
-    }
-    var midPoint=new Phaser.Point(blockRowValue+1,blockMidColumnValue);
-    rotatingTile=rotateTileAroundTile(rotatingTile,midPoint);
-    if(erase){//tr
-        levelData[rotatingTile.x][rotatingTile.y]=0;
-    }else{
-        levelData[rotatingTile.x][rotatingTile.y]=currentBlock.trBlock;
-    }
-    midPoint.x=blockRowValue+1;
-    midPoint.y=blockMidColumnValue;
-    rotatingTile=rotateTileAroundTile(rotatingTile,midPoint);
-    if(erase){//br
-        levelData[rotatingTile.x][rotatingTile.y]=0;
-    }else{
-        levelData[rotatingTile.x][rotatingTile.y]=currentBlock.brBlock;
-    }
-    midPoint.x=blockRowValue+1;
-    midPoint.y=blockMidColumnValue;
-    rotatingTile=rotateTileAroundTile(rotatingTile,midPoint);
-    if(erase){//b
-        levelData[rotatingTile.x][rotatingTile.y]=0;
-    }else{
-        levelData[rotatingTile.x][rotatingTile.y]=currentBlock.bBlock;
-    }
-    midPoint.x=blockRowValue+1;
-    midPoint.y=blockMidColumnValue;
-    rotatingTile=rotateTileAroundTile(rotatingTile,midPoint);
-    if(erase){//bl
-        levelData[rotatingTile.x][rotatingTile.y]=0;
-    }else{
-        levelData[rotatingTile.x][rotatingTile.y]=currentBlock.blBlock;
-    }
-    midPoint.x=blockRowValue+1;
-    midPoint.y=blockMidColumnValue;
-    rotatingTile=rotateTileAroundTile(rotatingTile,midPoint);
-    if(erase){//tl
-        levelData[rotatingTile.x][rotatingTile.y]=0;
-    }else{
-        levelData[rotatingTile.x][rotatingTile.y]=currentBlock.tlBlock;
-    }
-    clockWise=store;
+    needsRender=false;
 }
 function releaseBlock(){
-    blockRowValue=0;
+    if(blockPresent)return;
+    blockPresent=true;
+    blockMidRowValue=1;
     blockMidColumnValue=5;
     var whichBlock= Math.floor(1+(Math.random()*7));
-    //whichBlock=2;
+    //whichBlock=1;
     switch (whichBlock) {//assign blocks
         case 1:
             currentBlock=block1;
             break;
         case 2:
             currentBlock=block2;
-            //blockRowValue=-1;
+            blockMidRowValue=0;
             break;
         case 3:
             currentBlock=block3;
@@ -256,7 +195,7 @@ function releaseBlock(){
             break;
         case 6:
             currentBlock=block6;
-            //blockRowValue=-1;
+            blockMidRowValue=0;
             break;
         case 7:
             currentBlock=block7;
@@ -266,33 +205,185 @@ function releaseBlock(){
     }
     console.log(whichBlock);
 }
+//let us use cubic coordinates to simplify the block painting
+function paintBlock(erase, cement){
+    if(!blockPresent)return;
+    var store=clockWise;
+    clockWise=true;
+    var val=1;
+    if(cement){
+        val=2;
+    }
+    changeLevelData(blockMidRowValue,blockMidColumnValue,val,erase);
+    
+    var rotatingTile=new Phaser.Point(blockMidRowValue-1,blockMidColumnValue);
+    if(currentBlock.tBlock==1 || erase){
+        changeLevelData(rotatingTile.x,rotatingTile.y,val*currentBlock.tBlock,erase);
+    }
+    var midPoint=new Phaser.Point(blockMidRowValue,blockMidColumnValue);
+    rotatingTile=rotateTileAroundTile(rotatingTile,midPoint);
+    if(currentBlock.trBlock==1 || erase){
+        changeLevelData(rotatingTile.x,rotatingTile.y,val*currentBlock.trBlock,erase);
+    }
+    midPoint.x=blockMidRowValue;
+    midPoint.y=blockMidColumnValue;
+    rotatingTile=rotateTileAroundTile(rotatingTile,midPoint);
+    if(currentBlock.brBlock==1 || erase){
+        changeLevelData(rotatingTile.x,rotatingTile.y,val*currentBlock.brBlock,erase);
+    }
+    midPoint.x=blockMidRowValue;
+    midPoint.y=blockMidColumnValue;
+    rotatingTile=rotateTileAroundTile(rotatingTile,midPoint);
+    if(currentBlock.bBlock==1 || erase){
+        changeLevelData(rotatingTile.x,rotatingTile.y,val*currentBlock.bBlock,erase);
+    }
+    midPoint.x=blockMidRowValue;
+    midPoint.y=blockMidColumnValue;
+    rotatingTile=rotateTileAroundTile(rotatingTile,midPoint);
+    if(currentBlock.blBlock==1 || erase){
+        changeLevelData(rotatingTile.x,rotatingTile.y,val*currentBlock.blBlock,erase);
+    }
+    midPoint.x=blockMidRowValue;
+    midPoint.y=blockMidColumnValue;
+    rotatingTile=rotateTileAroundTile(rotatingTile,midPoint);
+    if(currentBlock.tlBlock==1 || erase){
+        changeLevelData(rotatingTile.x,rotatingTile.y,val*currentBlock.tlBlock,erase);
+    }
+    clockWise=store;
+}
+function checkAndCollapseRows(){
+    
+}
+function changeLevelData(iVal,jVal,newValue,erase){
+    if(!validIndexes(iVal,jVal))return;
+    if(erase){
+        levelData[iVal][jVal]=0;
+    }else{
+        levelData[iVal][jVal]=newValue;
+    }
+}
+function validIndexes(iVal,jVal){
+    if(iVal<0 || jVal<0 || iVal>=levelData.length || jVal>=levelData[0].length){
+        return false;
+    }
+    return true;
+}
 function moveLeft(){
+    if(!blockPresent)return;
+    if(!canMove(0,-1))return;
     paintBlock(true);
     blockMidColumnValue--;
-    renderScene();
+    needsRender=true;
 }
 function moveRight(){
+    if(!blockPresent)return;
+    if(!canMove(0,1))return;
     paintBlock(true);
     blockMidColumnValue++;
-    renderScene();
+    needsRender=true;
 }
 function dropDown(){
+    if(!blockPresent)return;
+    if(!canMove(1,0))return;
     paintBlock(true);
-    blockRowValue++;
-    renderScene();
+    blockMidRowValue++;
+    needsRender=true;
+}
+function validAndEmpty(iVal,jVal){
+    if(!validIndexes(iVal,jVal)){
+        return false;
+    }else if(levelData[iVal][jVal]==2){//occuppied
+        return false;
+    }
+    return true;
+}
+function canMove(iVal,jVal){
+    var validMove=true;
+    
+    var store=clockWise;
+    var newBlockMidPoint=new Phaser.Point(blockMidRowValue+iVal,blockMidColumnValue+jVal);
+    clockWise=true;
+    if(!validAndEmpty(newBlockMidPoint.x,newBlockMidPoint.y)){//check mid, always 1
+        validMove=false;
+    }
+    
+    var rotatingTile=new Phaser.Point(newBlockMidPoint.x-1,newBlockMidPoint.y);
+    if(currentBlock.tBlock==1){
+        if(!validAndEmpty(rotatingTile.x,rotatingTile.y)){//check top
+            validMove=false;
+        }
+    }
+    newBlockMidPoint.x=blockMidRowValue+iVal;
+    newBlockMidPoint.y=blockMidColumnValue+jVal;
+    rotatingTile=rotateTileAroundTile(rotatingTile,newBlockMidPoint);
+    if(currentBlock.trBlock==1){
+        if(!validAndEmpty(rotatingTile.x,rotatingTile.y)){
+            validMove=false;
+        }
+    }
+    newBlockMidPoint.x=blockMidRowValue+iVal;
+    newBlockMidPoint.y=blockMidColumnValue+jVal;
+    rotatingTile=rotateTileAroundTile(rotatingTile,newBlockMidPoint);
+    if(currentBlock.brBlock==1){
+        if(!validAndEmpty(rotatingTile.x,rotatingTile.y)){
+            validMove=false;
+        }
+    }
+    newBlockMidPoint.x=blockMidRowValue+iVal;
+    newBlockMidPoint.y=blockMidColumnValue+jVal;
+    rotatingTile=rotateTileAroundTile(rotatingTile,newBlockMidPoint);
+    if(currentBlock.bBlock==1){
+        if(!validAndEmpty(rotatingTile.x,rotatingTile.y)){
+            validMove=false;
+        }
+    }
+    newBlockMidPoint.x=blockMidRowValue+iVal;
+    newBlockMidPoint.y=blockMidColumnValue+jVal;
+    rotatingTile=rotateTileAroundTile(rotatingTile,newBlockMidPoint);
+    if(currentBlock.blBlock==1){
+        if(!validAndEmpty(rotatingTile.x,rotatingTile.y)){
+            validMove=false;
+        }
+    }
+    newBlockMidPoint.x=blockMidRowValue+iVal;
+    newBlockMidPoint.y=blockMidColumnValue+jVal;
+    rotatingTile=rotateTileAroundTile(rotatingTile,newBlockMidPoint);
+    if(currentBlock.tlBlock==1){
+        if(!validAndEmpty(rotatingTile.x,rotatingTile.y)){
+            validMove=false;
+        }
+    }
+    
+    clockWise=store;
+    return validMove;
 }
 function rotateClockWise(){
+    if(!blockPresent)return;
     clockWise=true;
+    prevBlock=currentBlock;
     rotateBlock();
-    renderScene();
+    if(!canMove(0,0)){
+        currentBlock=prevBlock;
+        return;
+    }else{
+        paintBlock(true);
+    }
+    needsRender=true;
 }
 function rotateAntiClockWise(){
+    if(!blockPresent)return;
     clockWise=false;
+    prevBlock=currentBlock;
     rotateBlock();
-    renderScene();
+    if(!canMove(0,0)){
+        currentBlock=prevBlock;
+        return;
+    }else{
+        paintBlock(true);
+    }
+    needsRender=true;
 }
 function rotateBlock(){
-    var numRotations=1;//rotate once
     var midPoint=new Phaser.Point(1,1);
     var newBlockData=
     [
@@ -309,10 +400,7 @@ function rotateBlock(){
                 if(currentBlockData[i][j]==1){//find every solid tile & rotate
                     rotatingTile.x=i;
                     rotatingTile.y=j;
-                    for (var k = 0; k < numRotations; k++)
-                    {
-                        rotatingTile=rotateTileAroundTile(rotatingTile,midPoint);
-                    }
+                    rotatingTile=rotateTileAroundTile(rotatingTile,midPoint);
                     newBlockData[rotatingTile.x][rotatingTile.y]=1;//populate new blockArray
                 }
             }
