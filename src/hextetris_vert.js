@@ -76,6 +76,7 @@ var cubicZ;
 var blockMidRowValue;
 var blockMidColumnValue;
 var needsRender;
+var needsClearing;
 var elapsedTime;
 var blockPresent;
 
@@ -115,6 +116,7 @@ function create() {
     blockPresent=false;
     releaseBlock();
     needsRender=true;
+    needsClearing=false;
     elapsedTime=0.0;
 }
 function update(){
@@ -122,6 +124,9 @@ function update(){
     if(elapsedTime>1.2){
         elapsedTime=0;
         dropDown();
+        if(needsClearing){
+            clearRows();
+        }
         needsRender=true;
     }
     if(needsRender){
@@ -129,8 +134,10 @@ function update(){
         if(!canMove(1,0)){
             paintBlock(false,true);
             blockPresent=false;
-            checkAndCollapseRows();
-            releaseBlock();
+            checkAndMarkRows();
+            if(!needsClearing){
+                releaseBlock();
+            }
         }
         renderScene();
     }
@@ -158,8 +165,10 @@ function renderScene(){
                 cubicZ=calculateCubicZ(axialPoint);
                 if(levelData[i][j]==1){
                     hexSprite.tint='0xff0000';
-                }else if(levelData[i][j]>1){
+                }else if(levelData[i][j]==2){
                     hexSprite.tint='0x0000ff';
+                }else if(levelData[i][j]>2){
+                    hexSprite.tint='0x00ff00';
                 }
                 gameScene.renderXY(hexSprite,startX, startY, false);
             }
@@ -171,7 +180,6 @@ function renderScene(){
 }
 function releaseBlock(){
     if(blockPresent)return;
-    blockPresent=true;
     blockMidRowValue=1;
     blockMidColumnValue=5;
     var whichBlock= Math.floor(1+(Math.random()*7));
@@ -203,7 +211,12 @@ function releaseBlock(){
         default:
            
     }
-    console.log(whichBlock);
+    if(canMove(0,0)){
+        blockPresent=true;
+    }else{
+       console.log("Game Over!"); 
+    }
+    //console.log(whichBlock);
 }
 //let us use cubic coordinates to simplify the block painting
 function paintBlock(erase, cement){
@@ -251,13 +264,55 @@ function paintBlock(erase, cement){
     }
     clockWise=store;
 }
-function checkAndCollapseRows(){
-    
+function clearRows(){
+    var alteredLevel=[[]];
+    alteredLevel.pop();
+    var rowsToAdd=0;
+    for (var i = levelData.length-1; i >-1 ; i--)
+    {
+        if(levelData[i][0]==5){
+            score+=levelData[0].length;
+            rowsToAdd++;
+        }else{
+            alteredLevel.push(levelData[i]);
+        }
+    }
+    for (var i = 0; i < rowsToAdd; i++)
+    {
+        alteredLevel.push([0,0,0,0,0,0,0,0,0,0,0]);
+    }
+    levelData=alteredLevel.reverse();
+    infoTxt.text=score;
+    needsClearing=false;
+}
+function checkAndMarkRows(){
+    var rowComplete=false;
+    for (var i = levelData.length-1; i >-1 ; i--)
+    {
+        rowComplete=true;
+        for (var j = 0; j < levelData[0].length; j++)
+        {
+            if(levelData[i][j]!=2){
+                rowComplete=false;
+                continue;
+            }
+        }
+        if(rowComplete){
+            for (var k = 0; k < levelData[0].length; k++)
+            {
+                changeLevelData(i,k,5);
+                elapsedTime=0;
+                needsClearing=true;
+            }
+        }
+    }
 }
 function changeLevelData(iVal,jVal,newValue,erase){
     if(!validIndexes(iVal,jVal))return;
     if(erase){
-        levelData[iVal][jVal]=0;
+        if(levelData[iVal][jVal]==1){
+            levelData[iVal][jVal]=0;
+        }
     }else{
         levelData[iVal][jVal]=newValue;
     }
@@ -292,7 +347,7 @@ function dropDown(){
 function validAndEmpty(iVal,jVal){
     if(!validIndexes(iVal,jVal)){
         return false;
-    }else if(levelData[iVal][jVal]==2){//occuppied
+    }else if(levelData[iVal][jVal]>1){//occuppied
         return false;
     }
     return true;
